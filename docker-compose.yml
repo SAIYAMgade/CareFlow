@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # Primary Database Engine: Oracle Database Free 23ai
+  oracle-db:
+    image: container-registry.oracle.com/database/free:latest
+    container_name: careflow-oracle-free
+    environment:
+      - ORACLE_PWD=CareFlowSecretPass2026#
+    ports:
+      - "1521:1521"
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+      - ./database/schema:/docker-entrypoint-initdb.d/setup:ro
+    restart: unless-stopped
+
+  # Backend API: FastAPI + python-oracledb
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: careflow-backend
+    environment:
+      - DATABASE_DIALECT=sqlite  # Set to "oracle" when connecting to oracle-db
+      - ORACLE_USER=careflow_admin
+      - ORACLE_PASSWORD=CareFlowSecretPass2026#
+      - ORACLE_DSN=oracle-db:1521/FREEPDB1
+      - PORT=8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - oracle-db
+    restart: unless-stopped
+
+  # Frontend: React + TypeScript + Vite Nginx Host
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../Dockerfile.frontend
+    container_name: careflow-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  oracle_data:
